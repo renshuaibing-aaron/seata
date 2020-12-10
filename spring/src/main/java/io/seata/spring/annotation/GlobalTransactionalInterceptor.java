@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.spring.annotation;
 
 import java.lang.annotation.Annotation;
@@ -46,7 +31,8 @@ import static io.seata.core.constants.DefaultValues.DEFAULT_DISABLE_GLOBAL_TRANS
 
 /**
  * The type Global transactional interceptor.
- *
+ *   这个是对应的Advices/Advisors
+ *   全局事务的拦截器
  * @author slievrly
  */
 public class GlobalTransactionalInterceptor implements ConfigurationChangeListener, MethodInterceptor {
@@ -70,6 +56,13 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
             DEFAULT_DISABLE_GLOBAL_TRANSACTION);
     }
 
+    /**
+     * 如果方法上有全局事务注解，调用handleGlobalTransaction开启全局事务
+     * 如果没有，按普通方法执行，避免性能下降
+     * @param methodInvocation
+     * @return
+     * @throws Throwable
+     */
     @Override
     public Object invoke(final MethodInvocation methodInvocation) throws Throwable {
         Class<?> targetClass = methodInvocation.getThis() != null ? AopUtils.getTargetClass(methodInvocation.getThis())
@@ -77,12 +70,18 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
         Method specificMethod = ClassUtils.getMostSpecificMethod(methodInvocation.getMethod(), targetClass);
         final Method method = BridgeMethodResolver.findBridgedMethod(specificMethod);
 
+        //获取方法GlobalTransactional注解
         final GlobalTransactional globalTransactionalAnnotation = getAnnotation(method, GlobalTransactional.class);
         final GlobalLock globalLockAnnotation = getAnnotation(method, GlobalLock.class);
+
+        //如果方法有GlobalTransactional注解，则拦截到相应方法处理
         if (!disable && globalTransactionalAnnotation != null) {
             return handleGlobalTransaction(methodInvocation, globalTransactionalAnnotation);
+
         } else if (!disable && globalLockAnnotation != null) {
+            System.out.println("======全局锁的方法======");
             return handleGlobalLock(methodInvocation);
+
         } else {
             return methodInvocation.proceed();
         }
@@ -103,6 +102,9 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
     private Object handleGlobalTransaction(final MethodInvocation methodInvocation,
                                            final GlobalTransactional globalTrxAnno) throws Throwable {
         try {
+
+            //最终调用的是TransactionalTemplate的execute方法
+            //这个模板方法定义了TM对全局事务处理的标准步骤
             return transactionalTemplate.execute(new TransactionalExecutor() {
                 @Override
                 public Object execute() throws Throwable {
@@ -119,11 +121,14 @@ public class GlobalTransactionalInterceptor implements ConfigurationChangeListen
 
                 @Override
                 public TransactionInfo getTransactionInfo() {
+
                     TransactionInfo transactionInfo = new TransactionInfo();
                     transactionInfo.setTimeOut(globalTrxAnno.timeoutMills());
                     transactionInfo.setName(name());
-                    transactionInfo.setPropagation(globalTrxAnno.propagation());
+                    transactionInfo.setPropagation(globalTrxAnno.propagation());  //事务传播类型
+
                     Set<RollbackRule> rollbackRules = new LinkedHashSet<>();
+
                     for (Class<?> rbRule : globalTrxAnno.rollbackFor()) {
                         rollbackRules.add(new RollbackRule(rbRule));
                     }

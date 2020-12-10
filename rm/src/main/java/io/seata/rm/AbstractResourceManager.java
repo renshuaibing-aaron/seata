@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.rm;
 
 import java.util.concurrent.TimeoutException;
@@ -45,6 +30,8 @@ public abstract class AbstractResourceManager implements ResourceManager {
     protected static final Logger LOGGER = LoggerFactory.getLogger(AbstractResourceManager.class);
 
     /**
+     * 创建BranchRegisterRequest请求，通过RmRpcClient客户端使用netty进行rpc调用，请求至TC，返回唯一的分支Id数据
+     * 超时或报错抛出TransactionException
      * registry branch record
      * @param branchType the branch type
      * @param resourceId the resource id
@@ -78,6 +65,8 @@ public abstract class AbstractResourceManager implements ResourceManager {
 
     /**
      * report branch status
+     * 创建BranchReportRequest请求，通过RmRpcClient客户端使用netty进行rpc调用，请求至TC，返回唯一的分支Id数据，
+     * 超时或报错抛出TransactionException
      * @param branchType      the branch type
      * @param xid             the xid
      * @param branchId        the branch id
@@ -117,6 +106,7 @@ public abstract class AbstractResourceManager implements ResourceManager {
 
     @Override
     public void registerResource(Resource resource) {
+        //将当前Resource的groupId和resourceId通过RPC发送给Server端，从而注册当前Resource
         RmRpcClient.getInstance().registerResource(resource.getResourceGroupId(), resource.getResourceId());
     }
 }

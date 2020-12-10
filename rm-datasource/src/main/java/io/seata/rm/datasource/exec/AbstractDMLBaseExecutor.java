@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.rm.datasource.exec;
 
 
@@ -68,9 +53,13 @@ public abstract class AbstractDMLBaseExecutor<T, S extends Statement> extends Ba
     @Override
     public T doExecute(Object... args) throws Throwable {
         AbstractConnectionProxy connectionProxy = statementProxy.getConnectionProxy();
+
+        //判断是不是自动提交模式
         if (connectionProxy.getAutoCommit()) {
+            //自动提价模式
             return executeAutoCommitTrue(args);
         } else {
+            //非自动提交模式
             return executeAutoCommitFalse(args);
         }
     }
@@ -83,9 +72,13 @@ public abstract class AbstractDMLBaseExecutor<T, S extends Statement> extends Ba
      * @throws Exception the exception
      */
     protected T executeAutoCommitFalse(Object[] args) throws Exception {
+        //
         TableRecords beforeImage = beforeImage();
+
         T result = statementCallback.execute(statementProxy.getTargetStatement(), args);
+
         TableRecords afterImage = afterImage(beforeImage);
+
         prepareUndoLog(beforeImage, afterImage);
         return result;
     }

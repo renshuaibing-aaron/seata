@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.tm.api;
 
 import io.seata.common.util.StringUtils;
@@ -88,8 +73,16 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
         begin(timeout, DEFAULT_GLOBAL_TX_NAME);
     }
 
+    /**
+     * 调用transactionManager.begin()方法通过TmRpcClient与server通信并生成一个xid
+     * 将xid绑定到Root上下文中
+     * @param timeout Given timeout in MILLISECONDS.
+     * @param name    Given name.
+     * @throws TransactionException
+     */
     @Override
     public void begin(int timeout, String name) throws TransactionException {
+
         if (role != GlobalTransactionRole.Launcher) {
             assertXIDNotNull();
             if (LOGGER.isDebugEnabled()) {
@@ -101,6 +94,7 @@ public class DefaultGlobalTransaction implements GlobalTransaction {
         if (RootContext.getXID() != null) {
             throw new IllegalStateException();
         }
+        //具体开启事务的方法，获取TC返回的XID
         xid = transactionManager.begin(null, null, name, timeout);
         status = GlobalStatus.Begin;
         RootContext.bind(xid);

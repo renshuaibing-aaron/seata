@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.rm.datasource.undo;
 
 import java.sql.Connection;
@@ -231,6 +216,8 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
      */
     @Override
     public void undo(DataSourceProxy dataSourceProxy, String xid, long branchId) throws TransactionException {
+
+        //根据unlog日志进行回滚
         Connection conn = null;
         ResultSet rs = null;
         PreparedStatement selectPST = null;
@@ -246,6 +233,7 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
                 }
 
                 // Find UNDO LOG
+                //根据Xid查询出数据
                 selectPST = conn.prepareStatement(SELECT_UNDO_LOG_SQL);
                 selectPST.setLong(1, branchId);
                 selectPST.setString(2, xid);
@@ -258,6 +246,7 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
                     // It is possible that the server repeatedly sends a rollback request to roll back
                     // the same branch transaction to multiple processes,
                     // ensuring that only the undo_log in the normal state is processed.
+                    //防重复提交
                     int state = rs.getInt(ClientTableColumnsName.UNDO_LOG_LOG_STATUS);
                     if (!canUndo(state)) {
                         if (LOGGER.isInfoEnabled()) {
@@ -282,6 +271,7 @@ public abstract class AbstractUndoLogManager implements UndoLogManager {
                         if (sqlUndoLogs.size() > 1) {
                             Collections.reverse(sqlUndoLogs);
                         }
+                        //反解析出回滚SQL并执行
                         for (SQLUndoLog sqlUndoLog : sqlUndoLogs) {
                             TableMeta tableMeta = TableMetaCacheFactory.getTableMetaCache(dataSourceProxy.getDbType()).getTableMeta(
                                 conn, sqlUndoLog.getTableName(), dataSourceProxy.getResourceId());

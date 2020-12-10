@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.rm.datasource;
 
 import java.sql.Connection;
@@ -39,6 +24,9 @@ import static io.seata.core.constants.DefaultValues.DEFAULT_CLIENT_REPORT_RETRY_
 import static io.seata.core.constants.DefaultValues.DEFAULT_CLIENT_REPORT_SUCCESS_ENABLE;
 
 /**
+ * 牛逼类  通过代理
+ *   todo  我们知道 在分布式事务的下游 并没有出现seata的代码 体现seata的无侵入性 但是是如何加入到
+ * 全局事务中的 原因就是在这个类里面
  * The type Connection proxy.
  *
  * @author sharajava
@@ -179,6 +167,9 @@ public class ConnectionProxy extends AbstractConnectionProxy {
 
     @Override
     public void commit() throws SQLException {
+
+        //如果当前是全局事务，则执行全局事务的提交
+        //判断是不是全局事务，就是看当前上下文是否存在XID
         try {
             LOCK_RETRY_POLICY.execute(() -> {
                 doCommit();
@@ -192,6 +183,9 @@ public class ConnectionProxy extends AbstractConnectionProxy {
     }
 
     private void doCommit() throws SQLException {
+
+        //如果当前是全局事务，则执行全局事务的提交
+        //判断是不是全局事务，就是看当前上下文是否存在XID
         if (context.inGlobalTransaction()) {
             processGlobalTransactionCommit();
         } else if (context.isGlobalLockRequire()) {
@@ -213,19 +207,26 @@ public class ConnectionProxy extends AbstractConnectionProxy {
 
     private void processGlobalTransactionCommit() throws SQLException {
         try {
+            //首先是向TC注册RM，拿到TC分配的branchId
+            //注意这个注册分支事务的时候会不会进行？ 判断全局锁
             register();
         } catch (TransactionException e) {
             recognizeLockKeyConflictException(e, context.buildLockKeys());
         }
         try {
+            //写入undolog
             UndoLogManagerFactory.getUndoLogManager(this.getDbType()).flushUndoLogs(this);
+
+            //提交本地事务，写入undo_log和业务数据在同一个本地事务中
             targetConnection.commit();
         } catch (Throwable ex) {
             LOGGER.error("process connectionProxy commit error: {}", ex.getMessage(), ex);
+            //向TC发送RM的事务处理失败的通知
             report(false);
             throw new SQLException(ex);
         }
         if (IS_REPORT_SUCCESS_ENABLE) {
+            //向TC发送RM的事务处理成功的通知
             report(true);
         }
         context.reset();
@@ -235,8 +236,10 @@ public class ConnectionProxy extends AbstractConnectionProxy {
         if (!context.hasUndoLog() || context.getLockKeysBuffer().isEmpty()) {
             return;
         }
+        //注册RM，构建request通过netty向TC发送注册指令
         Long branchId = DefaultResourceManager.get().branchRegister(BranchType.AT, getDataSourceProxy().getResourceId(),
             null, context.getXid(), null, context.buildLockKeys());
+        //将返回的branchId存在上下文中
         context.setBranchId(branchId);
     }
 

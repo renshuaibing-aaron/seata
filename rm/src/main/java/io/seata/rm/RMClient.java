@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.rm;
 
 import io.seata.core.rpc.netty.RmMessageListener;
@@ -32,9 +17,15 @@ public class RMClient {
      * @param transactionServiceGroup the transaction service group
      */
     public static void init(String applicationId, String transactionServiceGroup) {
+        // 获取单例对象
         RmRpcClient rmRpcClient = RmRpcClient.getInstance(applicationId, transactionServiceGroup);
+        // 设置ResourceManager的单例对象
         rmRpcClient.setResourceManager(DefaultResourceManager.get());
+        // 添加监听器，监听Server端的消息推送
+        //这里可以看出和TM客户端的不一样的地方 这个地方增加一个监听器保证
+        //RM除了主动操作本地资源外，还会因为全局事务的commit、rollback等的消息推送，从而对本地资源进行相关操作
         rmRpcClient.setClientMessageListener(new RmMessageListener(DefaultRMHandler.get(), rmRpcClient));
+        // 初始化RPC
         rmRpcClient.init();
     }
 

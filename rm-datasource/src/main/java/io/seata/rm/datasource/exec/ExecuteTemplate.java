@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.rm.datasource.exec;
 
 import io.seata.common.util.CollectionUtils;
@@ -54,7 +39,7 @@ public class ExecuteTemplate {
      *
      * @param <T>               the type parameter
      * @param <S>               the type parameter
-     * @param sqlRecognizer     the sql recognizer
+     * @param sqlRecognizers     the sql recognizer
      * @param statementProxy    the statement proxy
      * @param statementCallback the statement callback
      * @param args              the args
@@ -66,17 +51,27 @@ public class ExecuteTemplate {
                                                      StatementCallback<T, S> statementCallback,
                                                      Object... args) throws SQLException {
 
+        System.out.println("通过层层代理准备执行sql语句");
+
+        //首先检查当前事务是不是处于全局事务中
         if (!RootContext.inGlobalTransaction() && !RootContext.requireGlobalLock()) {
             // Just work as original statement
+            // 没有分布式事务，执行像普通sql一样执行
             return statementCallback.execute(statementProxy.getTargetStatement(), args);
         }
 
+        //生成一个sql的识别器对象，它能解析sql
+        //根据sql语句和数据库类型获取SQL识别器
         if (sqlRecognizers == null) {
             sqlRecognizers = SQLVisitorFactory.get(
                     statementProxy.getTargetSQL(),
                     statementProxy.getConnectionProxy().getDbType());
         }
+
+        //sql 执行器 根据不同的sql生成不同的执行器
         Executor<T> executor;
+
+        //根据sql的类型生成不同的类型的executor，传入不同发statementCallback
         if (CollectionUtils.isEmpty(sqlRecognizers)) {
             executor = new PlainExecutor<>(statementProxy, statementCallback);
         } else {
@@ -105,6 +100,7 @@ public class ExecuteTemplate {
         }
         T rs;
         try {
+            //执行sql
             rs = executor.execute(args);
         } catch (Throwable ex) {
             if (!(ex instanceof SQLException)) {

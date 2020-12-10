@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.spring.annotation;
 
 import java.lang.reflect.Method;
@@ -52,12 +37,17 @@ import static io.seata.core.constants.DefaultValues.DEFAULT_DISABLE_GLOBAL_TRANS
 
 /**
  * The type Global transaction scanner.
+ * 用于扫描所有有事务注解的方法
+ * 扫描@GlobalTransactional这个注解，并对代理方法进行拦截增强事务的功能
  *
+ * todo 注意看看实现的这几个接口
+ *  AbstractAutoProxyCreator :它Spring实现AOP的一种方式。本质上是一个BeanPostProcessor，他在bean初始化之前，
+ *    调用内部的createProxy方法，创建一个bean的AOP代理bean并返回
+ *    但是它不是把所有的bean都增强，选取哪些bean做增强呢？选取的策略是根据getAdvicesAndAdvisorsForBean方法返回的Advices/Advisors来确定的。
+ *   看到这里，其实总体的逻辑基本就清晰了，GlobalTransactionScanner扫描有注解的bean，做AOP增强。
  * @author slievrly
  */
-public class GlobalTransactionScanner extends AbstractAutoProxyCreator
-    implements InitializingBean, ApplicationContextAware,
-    DisposableBean {
+public class GlobalTransactionScanner extends AbstractAutoProxyCreator   implements InitializingBean, ApplicationContextAware, DisposableBean {
 
     private static final long serialVersionUID = 1L;
 
@@ -152,6 +142,9 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
         this.failureHandlerHook = failureHandlerHook;
     }
 
+    /**
+     * 是在销毁的时候会调用这个方法
+     */
     @Override
     public void destroy() {
         ShutdownHook.getInstance().destroyAll();
@@ -165,11 +158,13 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
             throw new IllegalArgumentException(String.format("applicationId: %s, txServiceGroup: %s", applicationId, txServiceGroup));
         }
         //init TM
+        System.out.println("初始化TM角色");
         TMClient.init(applicationId, txServiceGroup);
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info("Transaction Manager Client is initialized. applicationId[{}] txServiceGroup[{}]", applicationId, txServiceGroup);
         }
         //init RM
+        System.out.println("初始化RM角色");
         RMClient.init(applicationId, txServiceGroup);
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info("Resource Manager is initialized. applicationId[{}] txServiceGroup[{}]", applicationId, txServiceGroup);
@@ -191,6 +186,8 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
         ShutdownHook.getInstance().addDisposable(RmRpcClient.getInstance(applicationId, txServiceGroup));
     }
 
+    //todo  注意和spring aop进行连接起来  这里重写了这个方法 进行aop实现
+    //
     @Override
     protected Object wrapIfNecessary(Object bean, String beanName, Object cacheKey) {
         if (disableGlobalTransaction) {
@@ -272,6 +269,9 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
         return new Object[]{interceptor};
     }
 
+    /**
+     * 继承了InitializingBean接口
+     */
     @Override
     public void afterPropertiesSet() {
         if (disableGlobalTransaction) {
@@ -283,6 +283,11 @@ public class GlobalTransactionScanner extends AbstractAutoProxyCreator
         initClient();
     }
 
+    /**
+     * 实现ApplicationContextAware
+     * @param applicationContext
+     * @throws BeansException
+     */
     @Override
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
         this.applicationContext = applicationContext;

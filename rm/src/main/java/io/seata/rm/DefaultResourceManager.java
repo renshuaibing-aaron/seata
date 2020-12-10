@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.rm;
 
 import java.util.HashMap;
@@ -38,17 +23,20 @@ public class DefaultResourceManager implements ResourceManager {
 
     /**
      * all resource managers
+     *  所有的ResourceManager缓存
      */
     protected static Map<BranchType, ResourceManager> resourceManagers
         = new ConcurrentHashMap<>();
 
+
+    // 构造方法初始化
     private DefaultResourceManager() {
         initResourceManagers();
     }
 
     /**
      * Get resource manager.
-     *
+     * 单例模式
      * @return the resource manager
      */
     public static DefaultResourceManager get() {
@@ -65,8 +53,12 @@ public class DefaultResourceManager implements ResourceManager {
         resourceManagers.put(branchType, rm);
     }
 
+    /**
+     * 初始化加载所有的ResourceManager，此处目前只有DataResourceManager和TCCResourceManager
+     */
     protected void initResourceManagers() {
         //init all resource managers
+        // SPI机制加载所有的ResourceManager
         List<ResourceManager> allResourceManagers = EnhancedServiceLoader.loadAll(ResourceManager.class);
         if (CollectionUtils.isNotEmpty(allResourceManagers)) {
             for (ResourceManager rm : allResourceManagers) {
@@ -111,6 +103,7 @@ public class DefaultResourceManager implements ResourceManager {
 
     @Override
     public void registerResource(Resource resource) {
+        // 根据branchType选择了ResourceManager，调用其注册方法
         getResourceManager(resource.getBranchType()).registerResource(resource);
     }
 

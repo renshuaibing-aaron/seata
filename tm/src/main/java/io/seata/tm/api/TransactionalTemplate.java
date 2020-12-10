@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.tm.api;
 
 
@@ -49,6 +34,7 @@ public class TransactionalTemplate {
      */
     public Object execute(TransactionalExecutor business) throws Throwable {
         // 1 get transactionInfo
+        //开启全局事务beginTransaction  根据注释构造一个TransactionInfo对象
         TransactionInfo txInfo = business.getTransactionInfo();
         if (txInfo == null) {
             throw new ShouldNeverHappenException("transactionInfo does not exist");
@@ -56,6 +42,7 @@ public class TransactionalTemplate {
         // 1.1 get or create a transaction
         GlobalTransaction tx = GlobalTransactionContext.getCurrentOrCreate();
 
+        System.out.println("=======构造分布式事务======="+tx);
         // 1.2 Handle the Transaction propatation and the branchType
         Propagation propagation = txInfo.getPropagation();
         SuspendedResourcesHolder suspendedResourcesHolder = null;
@@ -101,16 +88,19 @@ public class TransactionalTemplate {
                 try {
 
                     // Do Your Business
+                    //执行业务方法
                     rs = business.execute();
 
                 } catch (Throwable ex) {
 
                     // 3.the needed business exception to rollback.
+                    //执行completeTransactionAfterThrowing回滚操作(抛异常)
                     completeTransactionAfterThrowing(txInfo, tx, ex);
                     throw ex;
                 }
 
                 // 4. everything is fine, commit.
+                //提交事务commitTransaction(若没抛异常)
                 commitTransaction(tx);
 
                 return rs;
@@ -171,8 +161,12 @@ public class TransactionalTemplate {
 
     private void beginTransaction(TransactionInfo txInfo, GlobalTransaction tx) throws TransactionalExecutor.ExecutionException {
         try {
+            //暂时没用
             triggerBeforeBegin();
+
             tx.begin(txInfo.getTimeOut(), txInfo.getName());
+
+            //暂时没用
             triggerAfterBegin();
         } catch (TransactionException txe) {
             throw new TransactionalExecutor.ExecutionException(tx, txe,

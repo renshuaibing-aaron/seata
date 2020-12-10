@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.rm.datasource;
 
 import javax.sql.DataSource;
@@ -36,6 +21,7 @@ import static io.seata.core.constants.DefaultValues.DEFAULT_CLIENT_TABLE_META_CH
 /**
  * The type Data source proxy.
  *
+ * 数据源代理 牛逼的方法
  * @author sharajava
  */
 public class DataSourceProxy extends AbstractDataSourceProxy implements Resource {
@@ -59,9 +45,9 @@ public class DataSourceProxy extends AbstractDataSourceProxy implements Resource
      */
     private static final long TABLE_META_CHECKER_INTERVAL = 60000L;
 
-    private final ScheduledExecutorService tableMetaExcutor = new ScheduledThreadPoolExecutor(1,
-        new NamedThreadFactory("tableMetaChecker", 1, true));
 
+    private final ScheduledExecutorService tableMetaExcutor = new ScheduledThreadPoolExecutor(1,
+            new NamedThreadFactory("tableMetaChecker", 1, true));
     /**
      * Instantiates a new Data source proxy.
      *
@@ -83,14 +69,22 @@ public class DataSourceProxy extends AbstractDataSourceProxy implements Resource
     }
 
     private void init(DataSource dataSource, String resourceGroupId) {
+
+        //资源组ID 如果初始化的时候构造方法没有传 会使用"default"这个默认值
         this.resourceGroupId = resourceGroupId;
+
         try (Connection connection = dataSource.getConnection()) {
+            //根据原始数据源得到JDBC连接和数据库类型
             jdbcUrl = connection.getMetaData().getURL();
             dbType = JdbcUtils.getDbType(jdbcUrl);
         } catch (SQLException e) {
             throw new IllegalStateException("can not init dataSource", e);
         }
+
+        //todo  注册资源 这个类实现了Resource接口
         DefaultResourceManager.get().registerResource(this);
+
+        //如果配置开关打开，会定时线程池不断更新表的元数据信息
         if (ENABLE_TABLE_META_CHECKER_ENABLE) {
             tableMetaExcutor.scheduleAtFixedRate(() -> {
                 try (Connection connection = dataSource.getConnection()) {
@@ -121,6 +115,12 @@ public class DataSourceProxy extends AbstractDataSourceProxy implements Resource
         return dbType;
     }
 
+    /**
+     * 注意这个地方获取
+     * 返回一个ConnectionProxy，而不是原生的Connection
+     * @return
+     * @throws SQLException
+     */
     @Override
     public ConnectionProxy getConnection() throws SQLException {
         Connection targetConnection = targetDataSource.getConnection();

@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.rm.datasource;
 
 import java.sql.Connection;
@@ -48,7 +33,7 @@ import static io.seata.core.constants.DefaultValues.DEFAULT_CLIENT_ASYNC_COMMIT_
 
 /**
  * The type Async worker.
- *
+ *AT模式下，最终是由AsyncWorker执行提交
  * @author sharajava
  */
 public class AsyncWorker implements ResourceManagerInbound {
@@ -112,6 +97,8 @@ public class AsyncWorker implements ResourceManagerInbound {
     @Override
     public BranchStatus branchCommit(BranchType branchType, String xid, long branchId, String resourceId,
                                      String applicationData) throws TransactionException {
+
+        //加入BlockingQueue
         if (!ASYNC_COMMIT_BUFFER.offer(new Phase2Context(branchType, xid, branchId, resourceId, applicationData))) {
             LOGGER.warn("Async commit buffer is FULL. Rejected branch [{}/{}] will be handled by housekeeping later.", branchId, xid);
         }
@@ -124,9 +111,11 @@ public class AsyncWorker implements ResourceManagerInbound {
     public synchronized void init() {
         LOGGER.info("Async Commit Buffer Limit: {}", ASYNC_COMMIT_BUFFER_LIMIT);
         ScheduledExecutorService timerExecutor = new ScheduledThreadPoolExecutor(1, new NamedThreadFactory("AsyncWorker", 1, true));
+
+        //每秒执行
         timerExecutor.scheduleAtFixedRate(() -> {
             try {
-
+                //提交
                 doBranchCommits();
 
             } catch (Throwable e) {

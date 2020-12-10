@@ -1,18 +1,3 @@
-/*
- *  Copyright 1999-2019 Seata.io Group.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
 package io.seata.server;
 
 import io.seata.common.XID;
@@ -60,28 +45,39 @@ public class Server {
         //initialize the parameter parser
         //Note that the parameter parser should always be the first line to execute.
         //Because, here we need to parse the parameters needed for startup.
+        //解析传入的参数配置
         ParameterParser parameterParser = new ParameterParser(args);
 
         //initialize the metrics
+        //初始化metrics
         MetricsManager.get().init();
 
+        //设置存储模式，支持文件、DB
         System.setProperty(ConfigurationKeys.STORE_MODE, parameterParser.getStoreMode());
 
+        //初始化一个RpcServer，其实就是一个netty的server，但并不马上start
         RpcServer rpcServer = new RpcServer(WORKING_THREADS);
         //server port
+        //设置端口
         rpcServer.setListenPort(parameterParser.getPort());
+        //初始化UUID生成器
         UUIDGenerator.init(parameterParser.getServerNode());
         //log store mode : file, db
+        //初始化Session管理器
         SessionHolder.init(parameterParser.getStoreMode());
-
+        //初始化协调者模块
         DefaultCoordinator coordinator = new DefaultCoordinator(rpcServer);
+        //初始化协调者
         coordinator.init();
+        //协调者作为handler设置到netty server中
         rpcServer.setHandler(coordinator);
         // register ShutdownHook
+        //添加ShutdownHook
         ShutdownHook.getInstance().addDisposable(coordinator);
         ShutdownHook.getInstance().addDisposable(rpcServer);
 
         //127.0.0.1 and 0.0.0.0 are not valid here.
+        //127.0.0.1 和 0.0.0.0 算非法IP.此处设置Server的IP
         if (NetUtil.isValidIp(parameterParser.getHost(), false)) {
             XID.setIpAddress(parameterParser.getHost());
         } else {
@@ -90,6 +86,7 @@ public class Server {
         XID.setPort(rpcServer.getListenPort());
 
         try {
+            //启动Server
             rpcServer.init();
         } catch (Throwable e) {
             LOGGER.error("rpcServer init error:{}", e.getMessage(), e);
